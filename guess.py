@@ -2,7 +2,7 @@ import random
 import time
 
 # ---------- Settings ----------
-DEBUG_SECRET = None     # For testing, set to a number such as 42. Set back to None before your final commit.
+DEBUG_SECRET = 42     # For testing, set to a number such as 42. Set back to None before your final commit.
 TIME_LIMIT = 60       # Seconds allowed in Time Challenge mode
 
 print("\n!!!Welcome to the Number Guessing Game!!!")
@@ -39,7 +39,23 @@ while True:
         print("Please type 1, 2, or 3.")
 
 # ---------- Choose a mode ----------
-# Not built yet. The mode menu comes on the time-challenge branch.
+# Same pattern as the level menu: show the choices, then keep asking until the answer is valid.
+# timed is True or False. The rest of the game checks timed to decide whether to use the clock.
+print("\nChoose a mode:")
+print("1. Classic")
+print(f"2. Time Challenge ({TIME_LIMIT} seconds)")
+
+while True:
+    mode_choice = input("Mode (1 or 2): ").strip()
+
+    if mode_choice == "1":
+        timed = False
+        break
+    elif mode_choice == "2":
+        timed = True
+        break
+    else:
+        print("Please type 1 or 2.")
 
 # ---------- Set up the round ----------
 # If DEBUG_SECRET has a number in it, use that number so tests are predictable.
@@ -52,15 +68,29 @@ else:
 # attempts_used counts only VALID guesses. It starts at 0 and goes up by 1 per valid guess.
 attempts_used = 0
 
-# result remembers how the round ended. We assume "lost" and change it to "won" on a correct guess.
-# Remembering this is what lets the end of the game print the right message exactly once.
+# result remembers how the round ended: "won", "lost" (out of attempts), or "timeout".
+# We assume "lost" and change it when something else happens.
 result = "lost"
+
+# Save the start time ONCE, here, before the guess loop. If you saved it inside the loop,
+# the clock would restart on every guess and the player would never run out of time.
+# In Classic mode we save it too, but never use it.
+start_time = time.time()
 
 print(f"\nI picked a number from {low} to {high}. You have {max_attempts} attempts.")
 
 # ---------- Guess loop ----------
-# The loop now stops on its own when attempts_used reaches max_attempts.
+# The loop stops on its own when attempts_used reaches max_attempts.
 while attempts_used < max_attempts:
+    # TIMER DISPLAY: shown before each guess, in Time Challenge mode only.
+    # elapsed is how many seconds have passed since the round started.
+    # round() gives a whole number. (int() would show 59 on the very first pass.)
+    # max(0, ...) stops the display from ever going below zero.
+    if timed:
+        elapsed = time.time() - start_time
+        seconds_left = max(0, round(TIME_LIMIT - elapsed))
+        print(f"Time remaining: {seconds_left} seconds")
+
     # Ask for a guess. strip() removes any spaces the player typed before or after the text.
     guess_text = input("\nYour guess: ").strip()
 
@@ -85,9 +115,17 @@ while attempts_used < max_attempts:
     # The guess is valid, so it counts as an attempt.
     attempts_used = attempts_used + 1
 
+    # TIMEOUT CHECK: only after a valid guess, and BEFORE we look at whether it was correct.
+    # That order is on purpose: if time ran out, even a correct guess does not count.
+    # input() waits for the player, so this is the first moment we can notice the time is up.
+    if timed and time.time() - start_time > TIME_LIMIT:
+        result = "timeout"
+        break
+
     # Compare the guess to the secret.
     if guess == secret_number:
         result = "won"
+        print("\nCongratulations! You guessed the number!")
         break  # A correct guess ends the round right away.
     elif guess < secret_number:
         print("Too low.")
@@ -99,9 +137,4 @@ while attempts_used < max_attempts:
     print(f"Attempts remaining: {attempts_left}")
 
 # ---------- End of round ----------
-# The loop ends in one of two ways right now: a win (break) or no attempts left.
-# result tells us which, so we print exactly one message.
-if result == "won":
-    print(f"Correct! You got it in {attempts_used} attempts.")
-else:
-    print(f"Out of attempts. The secret number was {secret_number}.")
+# The loop can end three ways: a win, a timeout, or no attempts left.
